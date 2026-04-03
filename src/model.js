@@ -379,9 +379,10 @@ export function createModel(state) {
   function resetState(clearHistory = true) {
     state.points = [];
     state.lines = [];
-    state.faces = [];
-    state.hoveredFace = null;
-    state.selectedFaces = [];
+	state.faces = [];
+	state.hoveredFace = null;
+	state.hoveredRotateLineId = null;
+	state.selectedFaces = [];
     state.glues = [];
     state.nextPointId = 1;
     state.nextLineId = 1;

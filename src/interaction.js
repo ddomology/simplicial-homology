@@ -15,6 +15,14 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     return { x: transformed.x, y: transformed.y };
   }
 
+  function isRotateButtonTarget(node) {
+    return !!node?.closest?.('[data-rotate-button="true"]');
+  }
+
+  function isLineTarget(node) {
+    return !!node?.closest?.('[data-face-kind="line"]');
+  }
+
   function createHistorySnapshot() {
     return {
       points: state.points.map((p) => ({ ...p })),
@@ -48,6 +56,7 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     state.nextGlueId = snapshot.nextGlueId;
 
     state.hoveredFace = null;
+    state.hoveredRotateLineId = null;
     state.selectedFaces = [];
     state.buildVertices = [];
     state.drag = {
@@ -119,6 +128,7 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     const beforeSnapshot = createHistorySnapshot();
     model.resetState(false);
     state.mode = "select";
+    state.hoveredRotateLineId = null;
     recordHistory(beforeSnapshot);
     renderAll();
   }
@@ -127,6 +137,7 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     state.mode = mode;
     state.buildVertices = [];
     state.selectedFaces = [];
+    state.hoveredRotateLineId = null;
     state.drag = {
       active: false,
       moved: false,
@@ -147,6 +158,7 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
 
     const beforeSnapshot = createHistorySnapshot();
     model.applyGlue();
+    state.hoveredRotateLineId = null;
     recordHistory(beforeSnapshot);
     renderAll();
   }
@@ -285,9 +297,13 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     state.mouse = pos;
 
     if (state.mode === "select") {
+      state.hoveredRotateLineId =
+        face.kind === "line" && model.getLineGlue?.(face.id) ? face.id : null;
       beginDrag(face, pos);
       return;
     }
+
+    state.hoveredRotateLineId = null;
 
     if (state.mode === "addPoint") {
       const beforeSnapshot = createHistorySnapshot();
@@ -312,6 +328,13 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
 
   function handleFaceHoverStart(face, evt) {
     state.hoveredFace = face;
+
+    if (face.kind === "line" && model.getLineGlue?.(face.id)) {
+      state.hoveredRotateLineId = face.id;
+    } else {
+      state.hoveredRotateLineId = null;
+    }
+
     tooltipEl.style.display = "block";
     tooltipEl.textContent = `${model.faceName(face)} · dim ${face.dim}`;
     tooltipEl.style.left = `${evt.clientX}px`;
@@ -324,10 +347,59 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     tooltipEl.style.top = `${evt.clientY}px`;
   }
 
-  function handleFaceHoverEnd() {
+  function handleFaceHoverEnd(face, evt) {
+    const next = evt?.relatedTarget;
+
+    if (face?.kind === "line" && isRotateButtonTarget(next)) {
+      tooltipEl.style.display = "none";
+      return;
+    }
+
+    state.hoveredFace = null;
+
+    if (face?.kind === "line" && state.hoveredRotateLineId === face.id) {
+      state.hoveredRotateLineId = null;
+    }
+
+    tooltipEl.style.display = "none";
+    renderAll();
+  }
+
+  function handleRotateHoverStart(lineId, _glueId, _evt) {
+    state.hoveredRotateLineId = lineId;
+    state.hoveredFace = model.faceRef("line", lineId);
+    tooltipEl.style.display = "none";
+    renderAll();
+  }
+
+  function handleRotateHoverMove(_lineId, _glueId, _evt) {}
+
+  function handleRotateHoverEnd(lineId, _glueId, evt) {
+    const next = evt?.relatedTarget;
+
+    if (isLineTarget(next)) {
+      state.hoveredRotateLineId = lineId;
+      return;
+    }
+
+    state.hoveredRotateLineId = null;
     state.hoveredFace = null;
     tooltipEl.style.display = "none";
     renderAll();
+  }
+
+  function handleRotatePointerDown(lineId, glueId, evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+
+    const beforeSnapshot = createHistorySnapshot();
+    const result = model.toggleGlueOrientation?.(glueId);
+
+    if (result) {
+      state.hoveredRotateLineId = lineId;
+      recordHistory(beforeSnapshot);
+      renderAll();
+    }
   }
 
   function handleBoardPointerDown(evt) {
@@ -336,6 +408,7 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
 
     const pos = boardPoint(evt);
     state.mouse = pos;
+    state.hoveredRotateLineId = null;
 
     if (state.mode === "select") {
       state.selectedFaces = [];
@@ -410,29 +483,47 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     const p1 = model.addPoint(0, 0);
     const p2 = model.addPoint(100, 0);
     const p3 = model.addPoint(0, 100);
+    const p4 = model.addPoint(200, 0);
+    const p5 = model.addPoint(300, 0);
 
-    const line = model.addLine(p1.id, p2.id);
-    assert(line !== null, "addLine creates a line");
-    assert(state.lines.length === 1, "line count after addLine");
+    const lineA = model.addLine(p1.id, p2.id);
+    const lineB = model.addLine(p4.id, p5.id);
+
+    assert(lineA !== null, "addLine creates a line");
+    assert(state.lines.length === 2, "line count after two addLine calls");
 
     const face = model.addFace(p1.id, p2.id, p3.id);
     assert(face !== null, "addFace creates a face");
     assert(state.faces.length === 1, "face count after addFace");
-    assert(state.lines.length === 3, "addFace auto-creates missing boundary edges");
+    assert(state.lines.length === 4, "addFace auto-creates missing boundary edges");
 
-    const pointGlueA = model.faceRef("point", 1);
-    const pointGlueB = model.faceRef("point", 2);
-    const lineGlue = model.faceRef("line", 1);
+    const pointGlueA = model.faceRef("point", p1.id);
+    const pointGlueB = model.faceRef("point", p2.id);
+    const lineGlueA = model.faceRef("line", lineA.id);
+    const lineGlueB = model.faceRef("line", lineB.id);
     const twoFace = model.faceRef("face", 1);
 
     assert(model.isCompatible(pointGlueA, pointGlueB) === true, "point glue allowed");
-    assert(model.isCompatible(pointGlueA, lineGlue) === false, "mixed-dimension glue blocked");
+    assert(model.isCompatible(pointGlueA, lineGlueA) === false, "mixed-dimension glue blocked");
     assert(
       model.isCompatible(twoFace, model.faceRef("face", 2)) === false,
       "2-face glue blocked"
     );
 
-    const dragPointIdsForLine = model.getDragPointIds(model.faceRef("line", line.id));
+    state.selectedFaces = [lineGlueA, lineGlueB];
+    const glue = model.applyGlue();
+    assert(glue?.dim === 1, "line glue gets created");
+
+    const arrowA = model.getLineArrowDirection?.(lineA.id);
+    const arrowB = model.getLineArrowDirection?.(lineB.id);
+    assert(arrowA?.fromPointId === p1.id, "line A arrow direction");
+    assert(arrowB?.fromPointId === p4.id, "line B arrow default direction");
+
+    model.toggleGlueOrientation?.(glue.id);
+    const arrowBFlipped = model.getLineArrowDirection?.(lineB.id);
+    assert(arrowBFlipped?.fromPointId === p5.id, "line B arrow flips on toggle");
+
+    const dragPointIdsForLine = model.getDragPointIds(model.faceRef("line", lineA.id));
     const dragPointIdsForFace = model.getDragPointIds(model.faceRef("face", face.id));
 
     assert(dragPointIdsForLine.length === 2, "line drag uses two endpoints");
@@ -450,10 +541,17 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     const p6 = model.addPoint(840, 360);
     const p7 = model.addPoint(650, 520);
 
-    model.addLine(p1.id, p2.id);
+    const l1 = model.addLine(p1.id, p2.id);
     model.addFace(p2.id, p3.id, p4.id);
-    model.addLine(p5.id, p6.id);
+
+    const l2 = model.addLine(p5.id, p6.id);
     model.addFace(p5.id, p6.id, p7.id);
+
+    state.selectedFaces = [
+      model.faceRef("line", l1.id),
+      model.faceRef("line", l2.id),
+    ];
+    model.applyGlue();
 
     setMode("select");
   }
@@ -466,6 +564,10 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     handleFaceHoverStart,
     handleFaceHoverMove,
     handleFaceHoverEnd,
+    handleRotateHoverStart,
+    handleRotateHoverMove,
+    handleRotateHoverEnd,
+    handleRotatePointerDown,
     bindGlobalEvents,
     runSelfTests,
     seedDemo,

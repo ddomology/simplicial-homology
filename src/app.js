@@ -28,24 +28,25 @@ const state = {
   nextLineId: 1,
   nextFaceId: 1,
   hoveredFace: null,
+  hoveredRotateLineId: null,
   selectedFaces: [],
   glues: [],
   nextGlueId: 1,
   history: {
-  undoStack: [],
-  redoStack: [],
-  maxSize: 100,
+    undoStack: [],
+    redoStack: [],
+    maxSize: 100,
   },
   buildVertices: [],
   mouse: { x: 0, y: 0 },
   snapRadius: 18,
   drag: {
-  active: false,
-  moved: false,
-  face: null,
-  startMouse: null,
-  pointStarts: [],
-  beforeSnapshot: null,
+    active: false,
+    moved: false,
+    face: null,
+    startMouse: null,
+    pointStarts: [],
+    beforeSnapshot: null,
   },
 };
 
@@ -81,6 +82,10 @@ const renderer = createRenderer({
     onFaceHoverStart: interaction.handleFaceHoverStart,
     onFaceHoverMove: interaction.handleFaceHoverMove,
     onFaceHoverEnd: interaction.handleFaceHoverEnd,
+    onRotateHoverStart: interaction.handleRotateHoverStart,
+    onRotateHoverMove: interaction.handleRotateHoverMove,
+    onRotateHoverEnd: interaction.handleRotateHoverEnd,
+    onRotatePointerDown: interaction.handleRotatePointerDown,
   }),
 });
 
@@ -135,8 +140,9 @@ function bindToolbarEvents() {
   });
 
   dom.resetAllButton.addEventListener("click", () => {
-  interaction.resetAllWithHistory();
+    interaction.resetAllWithHistory();
   });
+
   dom.undoButton.addEventListener("click", () => {
     interaction.undoHistory();
   });

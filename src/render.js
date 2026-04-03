@@ -64,13 +64,172 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
     });
   }
 
+  function attachRotateEvents(el, lineId, glueId) {
+    const handlers = getFaceHandlers();
+
+    el.style.cursor = "pointer";
+
+    el.addEventListener("mouseenter", (evt) => {
+      handlers.onRotateHoverStart?.(lineId, glueId, evt);
+    });
+
+    el.addEventListener("mousemove", (evt) => {
+      handlers.onRotateHoverMove?.(lineId, glueId, evt);
+    });
+
+    el.addEventListener("mouseleave", (evt) => {
+      handlers.onRotateHoverEnd?.(lineId, glueId, evt);
+    });
+
+    el.addEventListener("pointerdown", (evt) => {
+      evt.stopPropagation();
+      evt.preventDefault();
+      handlers.onRotatePointerDown?.(lineId, glueId, evt);
+    });
+  }
+
+  function lineGeometry(A, B) {
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+    const mx = (A.x + B.x) / 2;
+    const my = (A.y + B.y) / 2;
+
+    return { dx, dy, len, ux, uy, nx, ny, mx, my };
+  }
+
+  function drawArrowForLine(g, line) {
+    const arrow = model.getLineArrowDirection?.(line.id);
+    if (!arrow) return;
+
+    const from = model.getPointById(arrow.fromPointId);
+    const to = model.getPointById(arrow.toPointId);
+    if (!from || !to) return;
+
+    const geom = lineGeometry(from, to);
+
+    const cx = from.x + geom.ux * (geom.len * 0.5);
+    const cy = from.y + geom.uy * (geom.len * 0.5);
+
+    const bodyHalf = Math.min(18, Math.max(10, geom.len * 0.18));
+    const headLen = 10;
+    const headWidth = 6;
+
+    const x1 = cx - geom.ux * bodyHalf;
+    const y1 = cy - geom.uy * bodyHalf;
+    const x2 = cx + geom.ux * bodyHalf;
+    const y2 = cy + geom.uy * bodyHalf;
+
+    const leftX = x2 - geom.ux * headLen + geom.nx * headWidth;
+    const leftY = y2 - geom.uy * headLen + geom.ny * headWidth;
+    const rightX = x2 - geom.ux * headLen - geom.nx * headWidth;
+    const rightY = y2 - geom.uy * headLen - geom.ny * headWidth;
+
+    const lineFace = model.faceRef("line", line.id);
+    const s = faceVisualState(lineFace);
+    const glue = model.getLineGlue?.(line.id);
+    const color = glue?.color || s.glued?.color || "#dbe7ff";
+
+    const arrowGroup = createSvg("g", {
+      "pointer-events": "none",
+    });
+
+    arrowGroup.appendChild(
+      createSvg("line", {
+        x1,
+        y1,
+        x2,
+        y2,
+        stroke: color,
+        "stroke-width": 3,
+        "stroke-linecap": "round",
+        opacity: 0.96,
+      })
+    );
+
+    arrowGroup.appendChild(
+      createSvg("polygon", {
+        points: `${x2},${y2} ${leftX},${leftY} ${rightX},${rightY}`,
+        fill: color,
+        opacity: 0.98,
+      })
+    );
+
+    g.appendChild(arrowGroup);
+  }
+
+  function drawRotateButton(g, line) {
+    const glue = model.getLineGlue?.(line.id);
+    if (!glue) return;
+    if (state.hoveredRotateLineId !== line.id) return;
+
+    const A = model.getPointById(line.a);
+    const B = model.getPointById(line.b);
+    if (!A || !B) return;
+
+    const geom = lineGeometry(A, B);
+    const offset = 28;
+    const cx = geom.mx + geom.nx * offset;
+    const cy = geom.my + geom.ny * offset;
+
+    const group = createSvg("g", {
+      "data-rotate-button": "true",
+    });
+
+    group.appendChild(
+      createSvg("circle", {
+        cx,
+        cy,
+        r: 15,
+        fill: "#101722",
+        stroke: glue.color,
+        "stroke-width": 2.4,
+        opacity: 0.98,
+        "data-rotate-button": "true",
+      })
+    );
+
+    group.appendChild(
+      createSvg("path", {
+        d: `
+          M ${cx - 5} ${cy + 3}
+          A 7 7 0 1 1 ${cx + 5} ${cy - 3}
+        `,
+        fill: "none",
+        stroke: glue.color,
+        "stroke-width": 2.2,
+        "stroke-linecap": "round",
+        "data-rotate-button": "true",
+      })
+    );
+
+    group.appendChild(
+      createSvg("polygon", {
+        points: `${cx + 4},${cy - 8} ${cx + 10},${cy - 8} ${cx + 7},${cy - 2}`,
+        fill: glue.color,
+        "data-rotate-button": "true",
+      })
+    );
+
+    attachRotateEvents(group, line.id, glue.id);
+    g.appendChild(group);
+  }
+
   function drawPoint(g, point) {
     const face = model.faceRef("point", point.id);
     const s = faceVisualState(face);
     const build = isBuildVertex(point.id);
 
-    const color = s.glued
-      ? s.glued.color
+    const inducedGlueColor = model.getPointGlueColor?.(point.id) || null;
+    const pointGlue = s.glued;
+    const pointGlueColor = inducedGlueColor || pointGlue?.color || null;
+
+    const color = pointGlueColor
+      ? pointGlueColor
       : s.selected
         ? "#ffe083"
         : build
@@ -81,7 +240,7 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
               ? "#9ad1ff"
               : "#f4f7fb";
 
-    const halo = s.hovered || s.selected || s.glued || build || s.dragging;
+    const halo = s.hovered || s.selected || !!pointGlueColor || build || s.dragging;
 
     if (halo) {
       g.appendChild(
@@ -89,8 +248,8 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
           cx: point.x,
           cy: point.y,
           r: 15,
-          fill: s.glued
-            ? s.glued.color
+          fill: pointGlueColor
+            ? pointGlueColor
             : s.selected
               ? "#ffe083"
               : build
@@ -107,8 +266,9 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
         cy: point.y,
         r: 8,
         fill: color,
-        stroke: s.glued ? s.glued.color : "#10141c",
+        stroke: pointGlueColor || "#10141c",
         "stroke-width": 2,
+        "data-face-kind": "point",
       })
     );
 
@@ -117,6 +277,7 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
       cy: point.y,
       r: 18,
       fill: "transparent",
+      "data-face-kind": "point",
     });
     attachFaceEvents(hit, face);
     g.appendChild(hit);
@@ -126,9 +287,9 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
       fill: "#aebad3",
     });
 
-    if (s.glued) {
-      addText(g, point.x, point.y + 24, `g${s.glued.id}`, {
-        fill: s.glued.color,
+    if (pointGlue) {
+      addText(g, point.x, point.y + 24, `g${pointGlue.id}`, {
+        fill: pointGlue.color,
         "font-size": 11,
       });
     }
@@ -141,9 +302,10 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
 
     const face = model.faceRef("line", line.id);
     const s = faceVisualState(face);
+    const lineGlue = model.getLineGlue?.(line.id) || s.glued || null;
 
-    const color = s.glued
-      ? s.glued.color
+    const color = lineGlue
+      ? lineGlue.color
       : s.selected
         ? "#ffe083"
         : s.dragging
@@ -152,17 +314,18 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
             ? "#8bd1ff"
             : "#dbe7ff";
 
-    if (s.hovered || s.selected || s.glued || s.dragging) {
+    if (s.hovered || s.selected || lineGlue || s.dragging) {
       g.appendChild(
         createSvg("line", {
           x1: A.x,
           y1: A.y,
           x2: B.x,
           y2: B.y,
-          stroke: s.glued ? s.glued.color : s.selected ? "#ffe083" : "#58b7ff",
+          stroke: lineGlue ? lineGlue.color : s.selected ? "#ffe083" : "#58b7ff",
           "stroke-width": 16,
           "stroke-linecap": "round",
           opacity: 0.18,
+          "pointer-events": "none",
         })
       );
     }
@@ -176,8 +339,13 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
         stroke: color,
         "stroke-width": 5,
         "stroke-linecap": "round",
+        "data-face-kind": "line",
+        "pointer-events": "none",
       })
     );
+
+    drawArrowForLine(g, line);
+    drawRotateButton(g, line);
 
     const hit = createSvg("line", {
       x1: A.x,
@@ -187,6 +355,7 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
       stroke: "transparent",
       "stroke-width": 22,
       "stroke-linecap": "round",
+      "data-face-kind": "line",
     });
     attachFaceEvents(hit, face);
     g.appendChild(hit);
@@ -196,9 +365,9 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
       fill: "#aebad3",
     });
 
-    if (s.glued) {
-      addText(g, (A.x + B.x) / 2, (A.y + B.y) / 2 + 14, `g${s.glued.id}`, {
-        fill: s.glued.color,
+    if (lineGlue) {
+      addText(g, (A.x + B.x) / 2, (A.y + B.y) / 2 + 14, `g${lineGlue.id}`, {
+        fill: lineGlue.color,
         "font-size": 11,
       });
     }
@@ -229,6 +398,7 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
     const hit = createSvg("polygon", {
       points: pts,
       fill: "transparent",
+      "data-face-kind": "face",
     });
     attachFaceEvents(hit, face);
     g.appendChild(hit);
