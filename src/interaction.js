@@ -287,7 +287,6 @@ function handleFacePointerDown(face, evt) {
     const point = model.getOrCreatePoint(pos);
     handleBuildPoint(point);
   }
-  console.log("face down", state.mode, face.kind, pos);
 }
 
   function handleFaceHoverStart(face, evt) {
@@ -339,7 +338,6 @@ function handleFacePointerDown(face, evt) {
 	}
 
 	handleBuildPoint(point);
-	console.log("board down", state.mode, evt.target);
   }
 
   function handleGlobalMouseMove(evt) {
