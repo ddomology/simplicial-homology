@@ -365,7 +365,9 @@ function addText(g, x, y, text, attrs = {}) {
     }
     svg.appendChild(pointsGroup);
 
-    const previewGroup = createSvg("g");
+    const previewGroup = createSvg("g", {
+	  "pointer-events": "none",
+	});
     renderBuildPreview(previewGroup);
     svg.appendChild(previewGroup);
   }
