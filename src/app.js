@@ -8,6 +8,8 @@ const dom = {
   tooltipEl: document.getElementById("tooltip"),
   modeChip: document.getElementById("mode-chip"),
   applyGlueButton: document.getElementById("apply-glue"),
+  undoButton: document.getElementById("undo-button"),
+  redoButton: document.getElementById("redo-button"),
   resetAllButton: document.getElementById("reset-all"),
   modeButtons: {
     select: document.getElementById("mode-select"),
@@ -29,15 +31,21 @@ const state = {
   selectedFaces: [],
   glues: [],
   nextGlueId: 1,
+  history: {
+  undoStack: [],
+  redoStack: [],
+  maxSize: 100,
+  },
   buildVertices: [],
   mouse: { x: 0, y: 0 },
   snapRadius: 18,
   drag: {
-    active: false,
-    moved: false,
-    face: null,
-    startMouse: null,
-    pointStarts: [],
+  active: false,
+  moved: false,
+  face: null,
+  startMouse: null,
+  pointStarts: [],
+  beforeSnapshot: null,
   },
 };
 
@@ -59,6 +67,8 @@ function syncToolbar() {
 
   dom.modeChip.textContent = modeChipText[state.mode] ?? "모드";
   dom.applyGlueButton.disabled = !interaction.canApplyGlue();
+  dom.undoButton.disabled = !interaction.canUndo();
+  dom.redoButton.disabled = !interaction.canRedo();
 }
 
 const renderer = createRenderer({
@@ -111,8 +121,14 @@ function bindToolbarEvents() {
   });
 
   dom.resetAllButton.addEventListener("click", () => {
-    model.resetState();
-    interaction.setMode("select");
+  interaction.resetAllWithHistory();
+  });
+  dom.undoButton.addEventListener("click", () => {
+    interaction.undoHistory();
+  });
+
+  dom.redoButton.addEventListener("click", () => {
+    interaction.redoHistory();
   });
 }
 

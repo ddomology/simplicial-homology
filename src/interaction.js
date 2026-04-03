@@ -12,18 +12,120 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     const transformed = pt.matrixTransform(ctm.inverse());
     return { x: transformed.x, y: transformed.y };
   }
+function createHistorySnapshot() {
+  return {
+    points: state.points.map((p) => ({ ...p })),
+    lines: state.lines.map((l) => ({ ...l })),
+    faces: state.faces.map((f) => ({ ...f })),
+    glues: state.glues.map((g) => ({
+      ...g,
+      a: g.a ? { ...g.a } : null,
+      b: g.b ? { ...g.b } : null,
+    })),
+    nextPointId: state.nextPointId,
+    nextLineId: state.nextLineId,
+    nextFaceId: state.nextFaceId,
+    nextGlueId: state.nextGlueId,
+  };
+}
+
+function applyHistorySnapshot(snapshot) {
+  state.points = snapshot.points.map((p) => ({ ...p }));
+  state.lines = snapshot.lines.map((l) => ({ ...l }));
+  state.faces = snapshot.faces.map((f) => ({ ...f }));
+  state.glues = snapshot.glues.map((g) => ({
+    ...g,
+    a: g.a ? { ...g.a } : null,
+    b: g.b ? { ...g.b } : null,
+  }));
+
+  state.nextPointId = snapshot.nextPointId;
+  state.nextLineId = snapshot.nextLineId;
+  state.nextFaceId = snapshot.nextFaceId;
+  state.nextGlueId = snapshot.nextGlueId;
+
+  state.hoveredFace = null;
+  state.selectedFaces = [];
+  state.buildVertices = [];
+  state.drag = {
+    active: false,
+    moved: false,
+    face: null,
+    startMouse: null,
+    pointStarts: [],
+    beforeSnapshot: null,
+  };
+
+  tooltipEl.style.display = "none";
+}
+
+function snapshotsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function pushUndoSnapshot(snapshot) {
+  state.history.undoStack.push(snapshot);
+  if (state.history.undoStack.length > state.history.maxSize) {
+    state.history.undoStack.shift();
+  }
+}
+
+function recordHistory(beforeSnapshot) {
+  const afterSnapshot = createHistorySnapshot();
+  if (snapshotsEqual(beforeSnapshot, afterSnapshot)) {
+    return false;
+  }
+  pushUndoSnapshot(beforeSnapshot);
+  state.history.redoStack = [];
+  return true;
+}
+
+function canUndo() {
+  return state.history.undoStack.length > 0;
+}
+
+function canRedo() {
+  return state.history.redoStack.length > 0;
+}
+
+function undoHistory() {
+  if (!canUndo()) return;
+  const current = createHistorySnapshot();
+  const previous = state.history.undoStack.pop();
+  state.history.redoStack.push(current);
+  applyHistorySnapshot(previous);
+  renderAll();
+}
+
+function redoHistory() {
+  if (!canRedo()) return;
+  const current = createHistorySnapshot();
+  const next = state.history.redoStack.pop();
+  pushUndoSnapshot(current);
+  applyHistorySnapshot(next);
+  renderAll();
+}
+
+function resetAllWithHistory() {
+  const beforeSnapshot = createHistorySnapshot();
+  model.resetState(false);
+  state.mode = "select";
+  recordHistory(beforeSnapshot);
+  renderAll();
+}
 
   function setMode(mode) {
     state.mode = mode;
     state.buildVertices = [];
     state.selectedFaces = [];
-    state.drag = {
-      active: false,
-      moved: false,
-      face: null,
-      startMouse: null,
-      pointStarts: [],
-    };
+	state.drag = {
+	  active: false,
+	  moved: false,
+	  face: null,
+	  startMouse: null,
+	  pointStarts: [],
+	  beforeSnapshot: null,
+	};
     renderAll();
   }
 
@@ -31,33 +133,43 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     return model.canApplyGlue();
   }
 
-  function applyGlue() {
-    model.applyGlue();
-    renderAll();
+	function applyGlue() {
+	  if (!model.canApplyGlue()) return;
+	  const beforeSnapshot = createHistorySnapshot();
+	  model.applyGlue();
+	  recordHistory(beforeSnapshot);
+	  renderAll();
+	}
+
+function handleBuildPoint(point) {
+  if (state.mode === "select" || state.mode === "addPoint") return;
+  if (state.buildVertices.some((p) => p.id === point.id)) return;
+
+  state.buildVertices.push(point);
+
+  let mutated = false;
+  const beforeSnapshot = createHistorySnapshot();
+
+  if (state.mode === "addLine" && state.buildVertices.length === 2) {
+    mutated = !!model.addLine(state.buildVertices[0].id, state.buildVertices[1].id);
+    state.buildVertices = [];
   }
 
-  function handleBuildPoint(point) {
-    if (state.mode === "select" || state.mode === "addPoint") return;
-    if (state.buildVertices.some((p) => p.id === point.id)) return;
-
-    state.buildVertices.push(point);
-
-    if (state.mode === "addLine" && state.buildVertices.length === 2) {
-      model.addLine(state.buildVertices[0].id, state.buildVertices[1].id);
-      state.buildVertices = [];
-    }
-
-    if (state.mode === "addFace" && state.buildVertices.length === 3) {
-      model.addFace(
-        state.buildVertices[0].id,
-        state.buildVertices[1].id,
-        state.buildVertices[2].id
-      );
-      state.buildVertices = [];
-    }
-
-    renderAll();
+  if (state.mode === "addFace" && state.buildVertices.length === 3) {
+    mutated = !!model.addFace(
+      state.buildVertices[0].id,
+      state.buildVertices[1].id,
+      state.buildVertices[2].id
+    );
+    state.buildVertices = [];
   }
+
+  if (mutated) {
+    recordHistory(beforeSnapshot);
+  }
+
+  renderAll();
+}
 
   function toggleSelectedFace(face) {
     const index = state.selectedFaces.findIndex((item) =>
@@ -88,24 +200,25 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     renderAll();
   }
 
-  function beginDrag(face, pos) {
-    const pointIds = [...new Set(model.getDragPointIds(face))];
+	function beginDrag(face, pos) {
+	  const pointIds = [...new Set(model.getDragPointIds(face))];
 
-    state.drag = {
-      active: true,
-      moved: false,
-      face,
-      startMouse: pos,
-      pointStarts: pointIds
-        .map((id) => model.getPointById(id))
-        .filter(Boolean)
-        .map((point) => ({
-          id: point.id,
-          x: point.x,
-          y: point.y,
-        })),
-    };
-  }
+	  state.drag = {
+		active: true,
+		moved: false,
+		face,
+		startMouse: pos,
+		pointStarts: pointIds
+		  .map((id) => model.getPointById(id))
+		  .filter(Boolean)
+		  .map((point) => ({
+			id: point.id,
+			x: point.x,
+			y: point.y,
+		  })),
+		beforeSnapshot: createHistorySnapshot(),
+	  };
+	}
 
   function moveDrag(pos) {
     if (!state.drag.active) return;
@@ -127,27 +240,33 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     renderAll();
   }
 
-  function endDrag() {
-    if (!state.drag.active) return;
+function endDrag() {
+  if (!state.drag.active) return;
 
-    const dragFace = state.drag.face;
-    const moved = state.drag.moved;
+  const dragFace = state.drag.face;
+  const moved = state.drag.moved;
+  const beforeSnapshot = state.drag.beforeSnapshot;
 
-    state.drag = {
-      active: false,
-      moved: false,
-      face: null,
-      startMouse: null,
-      pointStarts: [],
-    };
+  state.drag = {
+    active: false,
+    moved: false,
+    face: null,
+    startMouse: null,
+    pointStarts: [],
+    beforeSnapshot: null,
+  };
 
-    if (!moved && dragFace) {
-      toggleSelectedFace(dragFace);
-      return;
-    }
-
-    renderAll();
+  if (!moved && dragFace) {
+    toggleSelectedFace(dragFace);
+    return;
   }
+
+  if (moved && beforeSnapshot) {
+    recordHistory(beforeSnapshot);
+  }
+
+  renderAll();
+}
 
   function handleFacePointerDown(face, evt) {
     const pos = boardPoint(evt);
@@ -198,14 +317,23 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
       return;
     }
 
-    if (state.mode === "addPoint") {
-      model.addPoint(pos.x, pos.y);
-      renderAll();
-      return;
-    }
+	if (state.mode === "addPoint") {
+	  const beforeSnapshot = createHistorySnapshot();
+	  model.addPoint(pos.x, pos.y);
+	  recordHistory(beforeSnapshot);
+	  renderAll();
+	  return;
+	}
 
-    const point = model.getOrCreatePoint(pos);
-    handleBuildPoint(point);
+	const beforeSnapshot = createHistorySnapshot();
+	const point = model.getOrCreatePoint(pos);
+	const createdPoint = !snapshotsEqual(beforeSnapshot, createHistorySnapshot());
+
+	if (createdPoint) {
+	  recordHistory(beforeSnapshot);
+	}
+
+	handleBuildPoint(point);
   }
 
   function handleGlobalMouseMove(evt) {
@@ -309,5 +437,10 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     bindGlobalEvents,
     runSelfTests,
     seedDemo,
+	canUndo,
+	canRedo,
+	undoHistory,
+	redoHistory,
+	resetAllWithHistory,
   };
 }

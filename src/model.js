@@ -198,27 +198,33 @@ export function createModel(state) {
     return area ? [area.a, area.b, area.c] : [];
   }
 
-  function resetState() {
-    state.points = [];
-    state.lines = [];
-    state.faces = [];
-    state.hoveredFace = null;
-    state.selectedFaces = [];
-    state.glues = [];
-    state.nextPointId = 1;
-    state.nextLineId = 1;
-    state.nextFaceId = 1;
-    state.nextGlueId = 1;
-    state.buildVertices = [];
-    state.mouse = { x: 0, y: 0 };
-    state.drag = {
-      active: false,
-      moved: false,
-      face: null,
-      startMouse: null,
-      pointStarts: [],
-    };
-  }
+	function resetState(clearHistory = true) {
+	  state.points = [];
+	  state.lines = [];
+	  state.faces = [];
+	  state.hoveredFace = null;
+	  state.selectedFaces = [];
+	  state.glues = [];
+	  state.nextPointId = 1;
+	  state.nextLineId = 1;
+	  state.nextFaceId = 1;
+	  state.nextGlueId = 1;
+	  state.buildVertices = [];
+	  state.mouse = { x: 0, y: 0 };
+	  state.drag = {
+		active: false,
+		moved: false,
+		face: null,
+		startMouse: null,
+		pointStarts: [],
+		beforeSnapshot: null,
+	  };
+
+	  if (clearHistory) {
+		state.history.undoStack = [];
+		state.history.redoStack = [];
+	  }
+	}
 
   return {
     state,
