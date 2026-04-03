@@ -84,11 +84,25 @@ const renderer = createRenderer({
   }),
 });
 
-function renderAll() {
+let renderQueued = false;
+
+function flushRender() {
+  renderQueued = false;
+
   syncToolbar();
   renderer.render();
-  updateAlgebraFromState(state);
+
+  if (!state.drag.active) {
+    updateAlgebraFromState(state);
+  }
+
   syncToolbar();
+}
+
+function renderAll() {
+  if (renderQueued) return;
+  renderQueued = true;
+  window.requestAnimationFrame(flushRender);
 }
 
 interaction = createInteraction({
