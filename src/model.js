@@ -110,11 +110,250 @@ export function createModel(state) {
     return true;
   }
 
+  function buildPointGlueGraphFromGlues(glues) {
+    const adjacency = new Map();
+    const glueIdsByPoint = new Map();
+
+    function ensurePoint(id) {
+      if (!adjacency.has(id)) adjacency.set(id, new Set());
+      if (!glueIdsByPoint.has(id)) glueIdsByPoint.set(id, new Set());
+    }
+
+    function linkPoints(u, v, glueId) {
+      ensurePoint(u);
+      ensurePoint(v);
+      adjacency.get(u).add(v);
+      adjacency.get(v).add(u);
+
+      if (glueId !== undefined && glueId !== null) {
+        glueIdsByPoint.get(u).add(glueId);
+        glueIdsByPoint.get(v).add(glueId);
+      }
+    }
+
+    for (const glue of glues) {
+      if (!glue) continue;
+
+      if (glue.dim === 0) {
+        if (glue.a?.kind === "point" && glue.b?.kind === "point") {
+          linkPoints(glue.a.id, glue.b.id, glue.id);
+        }
+        continue;
+      }
+
+      if (glue.dim === 1) {
+        if (glue.a?.kind !== "line" || glue.b?.kind !== "line") continue;
+
+        const endpointsA = getLineEndpoints(glue.a.id);
+        const endpointsB = getLineEndpoints(glue.b.id);
+        if (!endpointsA || !endpointsB) continue;
+
+        const [a0, a1] = endpointsA;
+        const [b0, b1] = endpointsB;
+
+        if (glue.reversed) {
+          linkPoints(a0, b1, glue.id);
+          linkPoints(a1, b0, glue.id);
+        } else {
+          linkPoints(a0, b0, glue.id);
+          linkPoints(a1, b1, glue.id);
+        }
+      }
+    }
+
+    return { adjacency, glueIdsByPoint };
+  }
+
+  function buildPointGlueGraph() {
+    return buildPointGlueGraphFromGlues(state.glues);
+  }
+
+  function computePointRepresentativeMapFromGlues(glues) {
+    const { adjacency } = buildPointGlueGraphFromGlues(glues);
+    const representative = new Map();
+
+    for (const point of state.points) {
+      if (representative.has(point.id)) continue;
+
+      if (!adjacency.has(point.id)) {
+        representative.set(point.id, point.id);
+        continue;
+      }
+
+      const queue = [point.id];
+      const component = [];
+      representative.set(point.id, null);
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        component.push(current);
+
+        const neighbors = adjacency.get(current);
+        if (!neighbors) continue;
+
+        for (const next of neighbors) {
+          if (representative.has(next)) continue;
+          representative.set(next, null);
+          queue.push(next);
+        }
+      }
+
+      const rep = Math.min(...component);
+      for (const v of component) {
+        representative.set(v, rep);
+      }
+    }
+
+    for (const point of state.points) {
+      if (!representative.has(point.id)) {
+        representative.set(point.id, point.id);
+      }
+    }
+
+    return representative;
+  }
+
+  function validateQuotientSimplicialFromGlues(glues) {
+    const representative = computePointRepresentativeMapFromGlues(glues);
+    const seenEdges = new Map();
+    const seenFaces = new Map();
+
+    for (const line of state.lines) {
+      const ra = representative.get(line.a);
+      const rb = representative.get(line.b);
+
+      if (ra === rb) {
+        return {
+          ok: false,
+          reason: "edge-collapse",
+          culprit: { kind: "line", id: line.id },
+        };
+      }
+
+      const edgeSig = sortedPair(ra, rb).join("-");
+      if (seenEdges.has(edgeSig)) {
+        return {
+          ok: false,
+          reason: "duplicate-edge",
+          culprit: {
+            first: { kind: "line", id: seenEdges.get(edgeSig).id },
+            second: { kind: "line", id: line.id },
+          },
+        };
+      }
+
+      seenEdges.set(edgeSig, line);
+    }
+
+    for (const face of state.faces) {
+      const [ra, rb, rc] = [
+        representative.get(face.a),
+        representative.get(face.b),
+        representative.get(face.c),
+      ];
+
+      if (new Set([ra, rb, rc]).size !== 3) {
+        return {
+          ok: false,
+          reason: "face-collapse",
+          culprit: { kind: "face", id: face.id },
+        };
+      }
+
+      const faceSig = sortedTriple(ra, rb, rc).join("-");
+      if (seenFaces.has(faceSig)) {
+        return {
+          ok: false,
+          reason: "duplicate-face",
+          culprit: {
+            first: { kind: "face", id: seenFaces.get(faceSig).id },
+            second: { kind: "face", id: face.id },
+          },
+        };
+      }
+
+      seenFaces.set(faceSig, face);
+    }
+
+    return {
+      ok: true,
+      reason: null,
+      culprit: null,
+    };
+  }
+
+  function validateQuotientSimplicial(extraGlues = []) {
+    return validateQuotientSimplicialFromGlues([...state.glues, ...extraGlues]);
+  }
+
+  function makeGlueCandidate(a, b, reversed = false) {
+    return {
+      id: -1,
+      color: null,
+      dim: a.dim,
+      a: { ...a },
+      b: { ...b },
+      reversed,
+    };
+  }
+
+  function getValidGlueCandidateForSelection() {
+    if (
+      state.selectedFaces.length !== 2 ||
+      !isCompatible(state.selectedFaces[0], state.selectedFaces[1])
+    ) {
+      return null;
+    }
+
+    const [a, b] = state.selectedFaces;
+
+    if (a.dim === 0) {
+      const candidate = makeGlueCandidate(a, b, false);
+      return validateQuotientSimplicial([candidate]).ok ? candidate : null;
+    }
+
+    const forward = makeGlueCandidate(a, b, false);
+    if (validateQuotientSimplicial([forward]).ok) {
+      return forward;
+    }
+
+    const reversed = makeGlueCandidate(a, b, true);
+    if (validateQuotientSimplicial([reversed]).ok) {
+      return reversed;
+    }
+
+    return null;
+  }
+
+  function getPendingGlueValidation() {
+    if (
+      state.selectedFaces.length !== 2 ||
+      !isCompatible(state.selectedFaces[0], state.selectedFaces[1])
+    ) {
+      return {
+        ok: false,
+        reason: "incompatible-selection",
+        culprit: null,
+      };
+    }
+
+    const [a, b] = state.selectedFaces;
+
+    if (a.dim === 0) {
+      return validateQuotientSimplicial([makeGlueCandidate(a, b, false)]);
+    }
+
+    const forwardResult = validateQuotientSimplicial([makeGlueCandidate(a, b, false)]);
+    if (forwardResult.ok) return forwardResult;
+
+    const reversedResult = validateQuotientSimplicial([makeGlueCandidate(a, b, true)]);
+    if (reversedResult.ok) return reversedResult;
+
+    return forwardResult;
+  }
+
   function canApplyGlue() {
-    return (
-      state.selectedFaces.length === 2 &&
-      isCompatible(state.selectedFaces[0], state.selectedFaces[1])
-    );
+    return !!getValidGlueCandidateForSelection();
   }
 
   function addPoint(x, y) {
@@ -198,15 +437,16 @@ export function createModel(state) {
   }
 
   function applyGlue() {
-    if (!canApplyGlue()) return null;
+    const candidate = getValidGlueCandidateForSelection();
+    if (!candidate) return null;
 
     const glue = {
       id: state.nextGlueId++,
       color: `hsl(${((state.glues.length + 1) * 137.508) % 360} 78% 62%)`,
-      dim: state.selectedFaces[0].dim,
-      a: state.selectedFaces[0],
-      b: state.selectedFaces[1],
-      reversed: false,
+      dim: candidate.dim,
+      a: candidate.a,
+      b: candidate.b,
+      reversed: !!candidate.reversed,
     };
 
     state.glues.push(glue);
@@ -218,55 +458,22 @@ export function createModel(state) {
     const glue = getGlueById(glueId);
     if (!glue || glue.dim !== 1) return null;
 
-    glue.reversed = !glue.reversed;
+    const candidate = {
+      ...glue,
+      a: glue.a ? { ...glue.a } : null,
+      b: glue.b ? { ...glue.b } : null,
+      reversed: !glue.reversed,
+    };
+
+    const otherGlues = state.glues.filter((g) => g.id !== glueId);
+    const validation = validateQuotientSimplicialFromGlues([...otherGlues, candidate]);
+
+    if (!validation.ok) {
+      return null;
+    }
+
+    glue.reversed = candidate.reversed;
     return glue;
-  }
-
-  function buildPointGlueGraph() {
-    const adjacency = new Map();
-    const glueIdsByPoint = new Map();
-
-    function ensurePoint(id) {
-      if (!adjacency.has(id)) adjacency.set(id, new Set());
-      if (!glueIdsByPoint.has(id)) glueIdsByPoint.set(id, new Set());
-    }
-
-    function linkPoints(u, v, glueId) {
-      ensurePoint(u);
-      ensurePoint(v);
-      adjacency.get(u).add(v);
-      adjacency.get(v).add(u);
-      glueIdsByPoint.get(u).add(glueId);
-      glueIdsByPoint.get(v).add(glueId);
-    }
-
-    for (const glue of state.glues) {
-      if (glue.dim === 0) {
-        if (glue.a.kind === "point" && glue.b.kind === "point") {
-          linkPoints(glue.a.id, glue.b.id, glue.id);
-        }
-        continue;
-      }
-
-      if (glue.dim === 1) {
-        const endpointsA = getLineEndpoints(glue.a.id);
-        const endpointsB = getLineEndpoints(glue.b.id);
-        if (!endpointsA || !endpointsB) continue;
-
-        const [a0, a1] = endpointsA;
-        const [b0, b1] = endpointsB;
-
-        if (glue.reversed) {
-          linkPoints(a0, b1, glue.id);
-          linkPoints(a1, b0, glue.id);
-        } else {
-          linkPoints(a0, b0, glue.id);
-          linkPoints(a1, b1, glue.id);
-        }
-      }
-    }
-
-    return { adjacency, glueIdsByPoint };
   }
 
   function getPointGlueComponent(pointId) {
@@ -336,7 +543,7 @@ export function createModel(state) {
       return {
         fromPointId: line.a,
         toPointId: line.b,
-        reversed: false,
+        reversed: !!glue.reversed,
         glueId: glue.id,
       };
     }
@@ -379,10 +586,10 @@ export function createModel(state) {
   function resetState(clearHistory = true) {
     state.points = [];
     state.lines = [];
-	state.faces = [];
-	state.hoveredFace = null;
-	state.hoveredRotateLineId = null;
-	state.selectedFaces = [];
+    state.faces = [];
+    state.hoveredFace = null;
+    state.hoveredRotateLineId = null;
+    state.selectedFaces = [];
     state.glues = [];
     state.nextPointId = 1;
     state.nextLineId = 1;
@@ -435,6 +642,11 @@ export function createModel(state) {
     applyGlue,
     toggleGlueOrientation,
     buildPointGlueGraph,
+    buildPointGlueGraphFromGlues,
+    computePointRepresentativeMapFromGlues,
+    validateQuotientSimplicialFromGlues,
+    validateQuotientSimplicial,
+    getPendingGlueValidation,
     getPointGlueComponent,
     getPointGlueColor,
     getLineArrowDirection,

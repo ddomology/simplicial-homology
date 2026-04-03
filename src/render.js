@@ -162,36 +162,67 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
     g.appendChild(arrowGroup);
   }
 
-  function drawRotateButton(g, line) {
-    const glue = model.getLineGlue?.(line.id);
-    if (!glue) return;
-    if (state.hoveredRotateLineId !== line.id) return;
+	function drawRotateButton(g, line) {
+	  const glue = model.getLineGlue?.(line.id);
+	  if (!glue) return;
+	  if (state.hoveredRotateLineId !== line.id) return;
 
-    const A = model.getPointById(line.a);
-    const B = model.getPointById(line.b);
-    if (!A || !B) return;
+	  const A = model.getPointById(line.a);
+	  const B = model.getPointById(line.b);
+	  if (!A || !B) return;
 
-    const geom = lineGeometry(A, B);
-    const offset = 28;
-    const cx = geom.mx + geom.nx * offset;
-    const cy = geom.my + geom.ny * offset;
+	  const geom = lineGeometry(A, B);
+	  const offset = 28;
+	  const cx = geom.mx + geom.nx * offset;
+	  const cy = geom.my + geom.ny * offset;
 
-    const group = createSvg("g", {
-      "data-rotate-button": "true",
-    });
+	  const size = 26;
 
-    group.appendChild(
-      createSvg("circle", {
-        cx,
-        cy,
-        r: 15,
-        fill: "#101722",
-        stroke: glue.color,
-        "stroke-width": 2.4,
-        opacity: 0.98,
-        "data-rotate-button": "true",
-      })
-    );
+	  const group = createSvg("g", {
+		"data-rotate-button": "true",
+	  });
+
+	  // 클릭 판정용 넓은 hit area
+	  group.appendChild(
+		createSvg("circle", {
+		  cx,
+		  cy,
+		  r: 16,
+		  fill: "transparent",
+		  "data-rotate-button": "true",
+		})
+	  );
+
+	  // 배경 원
+	  group.appendChild(
+		createSvg("circle", {
+		  cx,
+		  cy,
+		  r: 15,
+		  fill: "#101722",
+		  stroke: glue.color,
+		  "stroke-width": 2.4,
+		  opacity: 0.98,
+		  "data-rotate-button": "true",
+		})
+	  );
+
+	  // rotate.svg 아이콘
+	  const icon = createSvg("image", {
+		x: cx - size / 2,
+		y: cy - size / 2,
+		width: size,
+		height: size,
+		preserveAspectRatio: "xMidYMid meet",
+		"pointer-events": "none",
+		"data-rotate-button": "true",
+	  });
+	  icon.setAttribute("href", "./assets/rotate.svg");
+	  group.appendChild(icon);
+
+	  attachRotateEvents(group, line.id, glue.id);
+	  g.appendChild(group);
+	}
 
     group.appendChild(
       createSvg("path", {
