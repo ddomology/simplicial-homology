@@ -213,74 +213,45 @@ export function createModel(state) {
     return representative;
   }
 
-  function validateQuotientSimplicialFromGlues(glues) {
-    const representative = computePointRepresentativeMapFromGlues(glues);
-    const seenEdges = new Map();
-    const seenFaces = new Map();
+function validateQuotientSimplicialFromGlues(glues) {
+  const representative = computePointRepresentativeMapFromGlues(glues);
 
-    for (const line of state.lines) {
-      const ra = representative.get(line.a);
-      const rb = representative.get(line.b);
+  for (const line of state.lines) {
+    const ra = representative.get(line.a);
+    const rb = representative.get(line.b);
 
-      if (ra === rb) {
-        return {
-          ok: false,
-          reason: "edge-collapse",
-          culprit: { kind: "line", id: line.id },
-        };
-      }
-
-      const edgeSig = sortedPair(ra, rb).join("-");
-      if (seenEdges.has(edgeSig)) {
-        return {
-          ok: false,
-          reason: "duplicate-edge",
-          culprit: {
-            first: { kind: "line", id: seenEdges.get(edgeSig).id },
-            second: { kind: "line", id: line.id },
-          },
-        };
-      }
-
-      seenEdges.set(edgeSig, line);
+    if (ra === rb) {
+      return {
+        ok: false,
+        reason: "edge-collapse",
+        culprit: { kind: "line", id: line.id },
+      };
     }
-
-    for (const face of state.faces) {
-      const [ra, rb, rc] = [
-        representative.get(face.a),
-        representative.get(face.b),
-        representative.get(face.c),
-      ];
-
-      if (new Set([ra, rb, rc]).size !== 3) {
-        return {
-          ok: false,
-          reason: "face-collapse",
-          culprit: { kind: "face", id: face.id },
-        };
-      }
-
-      const faceSig = sortedTriple(ra, rb, rc).join("-");
-      if (seenFaces.has(faceSig)) {
-        return {
-          ok: false,
-          reason: "duplicate-face",
-          culprit: {
-            first: { kind: "face", id: seenFaces.get(faceSig).id },
-            second: { kind: "face", id: face.id },
-          },
-        };
-      }
-
-      seenFaces.set(faceSig, face);
-    }
-
-    return {
-      ok: true,
-      reason: null,
-      culprit: null,
-    };
   }
+
+  for (const face of state.faces) {
+    const [ra, rb, rc] = [
+      representative.get(face.a),
+      representative.get(face.b),
+      representative.get(face.c),
+    ];
+
+    if (new Set([ra, rb, rc]).size !== 3) {
+      return {
+        ok: false,
+        reason: "face-collapse",
+        culprit: { kind: "face", id: face.id },
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    reason: null,
+    culprit: null,
+  };
+}
+}
 
   function validateQuotientSimplicial(extraGlues = []) {
     return validateQuotientSimplicialFromGlues([...state.glues, ...extraGlues]);
