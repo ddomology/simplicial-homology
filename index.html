@@ -14,16 +14,15 @@
       <div class="section">
         <h2>추가 모드</h2>
         <div class="toolbar">
-		<div class="history-toolbar">
-		  <button id="undo-button" class="secondary icon-button" disabled>
-			<img src="./assets/undo.svg" alt="undo" />
-			<span>되돌리기</span>
-		  </button>
-		  <button id="redo-button" class="secondary icon-button" disabled>
-			<img src="./assets/redo.svg" alt="redo" />
-			<span>다시하기</span>
-		  </button>
-		</div>
+			<div class="history-toolbar">
+			  <button id="undo-button" class="secondary icon-only-button" disabled aria-label="되돌리기" title="되돌리기">
+				<img src="./assets/undo.svg" alt="" />
+			  </button>
+
+			  <button id="redo-button" class="secondary icon-only-button" disabled aria-label="다시하기" title="다시하기">
+				<img src="./assets/redo.svg" alt="" />
+			  </button>
+			</div>
           <button id="mode-select" class="active">선택 모드</button>
           <button id="mode-add-point">점 추가</button>
           <button id="mode-add-line">선 추가</button>

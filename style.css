@@ -210,3 +210,27 @@ button:disabled {
     height: 70vh;
   }
 }
+
+.history-toolbar {
+  display: grid;
+  grid-template-columns: 44px 44px;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.icon-only-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-only-button img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: brightness(0) saturate(100%) invert(92%) sepia(18%) saturate(460%) hue-rotate(184deg) brightness(104%) contrast(105%);
+}
