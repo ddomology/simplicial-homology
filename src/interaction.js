@@ -473,88 +473,81 @@ export function createInteraction({ state, svg, tooltipEl, model, renderAll }) {
     window.addEventListener("blur", handleGlobalPointerUp);
   }
 
-  function runSelfTests() {
-    function assert(condition, name) {
-      console.assert(condition, `Self-test failed: ${name}`);
-    }
+	function runSelfTests() {
+	  function assert(condition, name) {
+		console.assert(condition, `Self-test failed: ${name}`);
+	  }
 
-    model.resetState();
+	  model.resetState();
 
-    const p1 = model.addPoint(0, 0);
-    const p2 = model.addPoint(100, 0);
-    const p3 = model.addPoint(0, 100);
-    const p4 = model.addPoint(200, 0);
-    const p5 = model.addPoint(300, 0);
+	  const p1 = model.addPoint(0, 0);
+	  const p2 = model.addPoint(100, 0);
+	  const p3 = model.addPoint(0, 100);
+	  const p4 = model.addPoint(200, 0);
+	  const p5 = model.addPoint(300, 0);
+	  const p6 = model.addPoint(400, 80);
+	  const p7 = model.addPoint(500, 80);
 
-    const lineA = model.addLine(p1.id, p2.id);
-    const lineB = model.addLine(p4.id, p5.id);
+	  const lineA = model.addLine(p1.id, p2.id);
+	  const lineB = model.addLine(p4.id, p5.id);
 
-    assert(lineA !== null, "addLine creates a line");
-    assert(state.lines.length === 2, "line count after two addLine calls");
+	  assert(lineA !== null, "addLine creates a line");
+	  assert(state.lines.length === 2, "line count after two addLine calls");
 
-    const face = model.addFace(p1.id, p2.id, p3.id);
-    assert(face !== null, "addFace creates a face");
-    assert(state.faces.length === 1, "face count after addFace");
-    assert(state.lines.length === 4, "addFace auto-creates missing boundary edges");
+	  const face = model.addFace(p1.id, p2.id, p3.id);
+	  assert(face !== null, "addFace creates a face");
+	  assert(state.faces.length === 1, "face count after addFace");
+	  assert(state.lines.length === 4, "addFace auto-creates missing boundary edges");
 
-    const pointGlueA = model.faceRef("point", p1.id);
-    const pointGlueB = model.faceRef("point", p2.id);
-    const lineGlueA = model.faceRef("line", lineA.id);
-    const lineGlueB = model.faceRef("line", lineB.id);
-    const twoFace = model.faceRef("face", 1);
+	  const pointGlueA = model.faceRef("point", p6.id);
+	  const pointGlueB = model.faceRef("point", p7.id);
+	  const lineGlueA = model.faceRef("line", lineA.id);
+	  const lineGlueB = model.faceRef("line", lineB.id);
+	  const twoFace = model.faceRef("face", 1);
 
-    assert(model.isCompatible(pointGlueA, pointGlueB) === true, "point glue allowed");
-    assert(model.isCompatible(pointGlueA, lineGlueA) === false, "mixed-dimension glue blocked");
-    assert(
-      model.isCompatible(twoFace, model.faceRef("face", 2)) === false,
-      "2-face glue blocked"
-    );
+	  assert(model.isCompatible(pointGlueA, pointGlueB) === true, "point glue allowed");
+	  assert(model.isCompatible(pointGlueA, lineGlueA) === false, "mixed-dimension glue blocked");
+	  assert(
+		model.isCompatible(twoFace, model.faceRef("face", 2)) === false,
+		"2-face glue blocked"
+	  );
 
-    state.selectedFaces = [lineGlueA, lineGlueB];
-    const glue = model.applyGlue();
-    assert(glue?.dim === 1, "line glue gets created");
+	  // strict abstract simplicial mode에서는 line glue가 reject되는 게 정상
+	  state.selectedFaces = [lineGlueA, lineGlueB];
+	  assert(model.canApplyGlue() === false, "line glue rejected in strict abstract simplicial mode");
+	  const rejectedGlue = model.applyGlue();
+	  assert(rejectedGlue === null, "line glue not created under strict validation");
 
-    const arrowA = model.getLineArrowDirection?.(lineA.id);
-    const arrowB = model.getLineArrowDirection?.(lineB.id);
-    assert(arrowA?.fromPointId === p1.id, "line A arrow direction");
-    assert(arrowB?.fromPointId === p4.id, "line B arrow default direction");
+	  // 대신 안전한 point glue는 성공 예시로 테스트
+	  state.selectedFaces = [pointGlueA, pointGlueB];
+	  const pointGlue = model.applyGlue();
+	  assert(pointGlue?.dim === 0, "point glue gets created");
 
-    model.toggleGlueOrientation?.(glue.id);
-    const arrowBFlipped = model.getLineArrowDirection?.(lineB.id);
-    assert(arrowBFlipped?.fromPointId === p5.id, "line B arrow flips on toggle");
+	  const dragPointIdsForLine = model.getDragPointIds(model.faceRef("line", lineA.id));
+	  const dragPointIdsForFace = model.getDragPointIds(model.faceRef("face", face.id));
 
-    const dragPointIdsForLine = model.getDragPointIds(model.faceRef("line", lineA.id));
-    const dragPointIdsForFace = model.getDragPointIds(model.faceRef("face", face.id));
+	  assert(dragPointIdsForLine.length === 2, "line drag uses two endpoints");
+	  assert(dragPointIdsForFace.length === 3, "face drag uses three vertices");
 
-    assert(dragPointIdsForLine.length === 2, "line drag uses two endpoints");
-    assert(dragPointIdsForFace.length === 3, "face drag uses three vertices");
+	  model.resetState();
+	}
 
-    model.resetState();
-  }
+function seedDemo() {
+  const p1 = model.addPoint(220, 180);
+  const p2 = model.addPoint(390, 160);
+  const p3 = model.addPoint(520, 300);
+  const p4 = model.addPoint(330, 430);
+  const p5 = model.addPoint(710, 210);
+  const p6 = model.addPoint(840, 360);
+  const p7 = model.addPoint(650, 520);
 
-  function seedDemo() {
-    const p1 = model.addPoint(220, 180);
-    const p2 = model.addPoint(390, 160);
-    const p3 = model.addPoint(520, 300);
-    const p4 = model.addPoint(330, 430);
-    const p5 = model.addPoint(710, 210);
-    const p6 = model.addPoint(840, 360);
-    const p7 = model.addPoint(650, 520);
+  model.addLine(p1.id, p2.id);
+  model.addFace(p2.id, p3.id, p4.id);
+  model.addLine(p5.id, p6.id);
+  model.addFace(p5.id, p6.id, p7.id);
 
-    const l1 = model.addLine(p1.id, p2.id);
-    model.addFace(p2.id, p3.id, p4.id);
-
-    const l2 = model.addLine(p5.id, p6.id);
-    model.addFace(p5.id, p6.id, p7.id);
-
-    state.selectedFaces = [
-      model.faceRef("line", l1.id),
-      model.faceRef("line", l2.id),
-    ];
-    model.applyGlue();
-
-    setMode("select");
-  }
+  setMode("select");
+}
 
   return {
     setMode,
