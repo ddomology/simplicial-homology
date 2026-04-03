@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Point Line Face UI Prototype</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>Point / Line / Face UI</h1>
+
+      <div class="section">
+        <h2>추가 모드</h2>
+        <div class="toolbar">
+          <button id="mode-select" class="active">선택 모드</button>
+          <button id="mode-add-point">점 추가</button>
+          <button id="mode-add-line">선 추가</button>
+          <button id="mode-add-face">면 추가</button>
+        </div>
+
+        <div class="toolbar" style="margin-top: 12px;">
+          <button id="apply-glue" class="secondary" disabled>붙이기</button>
+          <button id="reset-all" class="secondary">전체 리셋</button>
+        </div>
+
+        <div class="muted" style="margin-top: 12px;">
+          선택 모드에서는 클릭은 선택, 드래그는 이동으로 동작한다.
+          선을 드래그하면 양 끝점이 함께 움직이고, 면을 드래그하면 세 꼭짓점이 함께 움직인다.
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Homology</h2>
+
+        <div class="legend-item">
+          <div><strong>H_0</strong><br><span class="muted">계산 전</span></div>
+        </div>
+
+        <div class="legend-item" style="margin-top: 8px;">
+          <div><strong>H_1</strong><br><span class="muted">계산 전</span></div>
+        </div>
+
+        <div class="legend-item" style="margin-top: 8px;">
+          <div><strong>H_2</strong><br><span class="muted">계산 전</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <svg id="board" viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid meet"></svg>
+
+      <div class="overlay">
+        <div id="mode-chip" class="chip">모드: 선택</div>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+    </main>
+
+    <aside class="inspector">
+      <h1>Algebra Panel</h1>
+
+      <div class="section">
+        <h2>H_0</h2>
+        <div class="algebra-card">
+          <div class="algebra-row">
+            <div class="algebra-label">ker ∂_0</div>
+            <div class="algebra-value" id="ker-0">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">im ∂_1</div>
+            <div class="algebra-value" id="im-1">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">H_0 ≅</div>
+            <div class="algebra-value" id="iso-0">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">basis</div>
+            <div class="algebra-value" id="basis-0">표시 예정</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>H_1</h2>
+        <div class="algebra-card">
+          <div class="algebra-row">
+            <div class="algebra-label">ker ∂_1</div>
+            <div class="algebra-value" id="ker-1">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">im ∂_2</div>
+            <div class="algebra-value" id="im-2">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">H_1 ≅</div>
+            <div class="algebra-value" id="iso-1">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">basis</div>
+            <div class="algebra-value" id="basis-1">표시 예정</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>H_2</h2>
+        <div class="algebra-card">
+          <div class="algebra-row">
+            <div class="algebra-label">ker ∂_2</div>
+            <div class="algebra-value" id="ker-2">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">im ∂_3</div>
+            <div class="algebra-value" id="im-3">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">H_2 ≅</div>
+            <div class="algebra-value" id="iso-2">표시 예정</div>
+          </div>
+          <div class="algebra-row">
+            <div class="algebra-label">basis</div>
+            <div class="algebra-value" id="basis-2">표시 예정</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
