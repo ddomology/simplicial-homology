@@ -268,22 +268,26 @@ function endDrag() {
   renderAll();
 }
 
-  function handleFacePointerDown(face, evt) {
-    const pos = boardPoint(evt);
-    state.mouse = pos;
+function handleFacePointerDown(face, evt) {
+  const pos = boardPoint(evt);
+  state.mouse = pos;
 
-    if (state.mode === "select") {
-      beginDrag(face, pos);
-      return;
-    }
-
-    if (face.kind === "point") {
-      const point = model.getPointById(face.id);
-      if (point) {
-        handleBuildPoint(point);
-      }
-    }
+  if (state.mode === "select") {
+    beginDrag(face, pos);
+    return;
   }
+
+  if (state.mode === "addPoint") {
+    model.addPoint(pos.x, pos.y);
+    renderAll();
+    return;
+  }
+
+  if (state.mode === "addLine" || state.mode === "addFace") {
+    const point = model.getOrCreatePoint(pos);
+    handleBuildPoint(point);
+  }
+}
 
   function handleFaceHoverStart(face, evt) {
     state.hoveredFace = face;
