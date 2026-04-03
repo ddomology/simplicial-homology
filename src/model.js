@@ -251,7 +251,6 @@ function validateQuotientSimplicialFromGlues(glues) {
     culprit: null,
   };
 }
-}
 
   function validateQuotientSimplicial(extraGlues = []) {
     return validateQuotientSimplicialFromGlues([...state.glues, ...extraGlues]);
