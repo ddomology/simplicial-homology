@@ -9,20 +9,21 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
     return el;
   }
 
-  function addText(g, x, y, text, attrs = {}) {
-    const el = createSvg("text", {
-      x,
-      y,
-      "font-size": 14,
-      "font-weight": 700,
-      fill: "#d8e2f5",
-      "text-anchor": "middle",
-      ...attrs,
-    });
-    el.textContent = text;
-    g.appendChild(el);
-    return el;
-  }
+function addText(g, x, y, text, attrs = {}) {
+  const el = createSvg("text", {
+    x,
+    y,
+    "font-size": 14,
+    "font-weight": 700,
+    fill: "#d8e2f5",
+    "text-anchor": "middle",
+    "pointer-events": "none",
+    ...attrs,
+  });
+  el.textContent = text;
+  g.appendChild(el);
+  return el;
+}
 
   function faceVisualState(face) {
     const hovered = model.faceEquals(state.hoveredFace, face);
@@ -241,7 +242,9 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
   }
 
   function renderGrid() {
-    const grid = createSvg("g");
+	  const grid = createSvg("g", {
+		"pointer-events": "none",
+	  });
 
     for (let x = 0; x <= 1200; x += 60) {
       grid.appendChild(
