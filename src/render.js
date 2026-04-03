@@ -57,11 +57,29 @@ function addText(g, x, y, text, attrs = {}) {
       handlers.onFaceHoverEnd?.(face, evt);
     });
 
-    el.addEventListener("mousedown", (evt) => {
-      evt.stopPropagation();
-      evt.preventDefault();
-      handlers.onFacePointerDown?.(face, evt);
-    });
+el.addEventListener('mousedown', evt => {
+  evt.stopPropagation();
+  evt.preventDefault();
+
+  const pos = boardPoint(evt);
+  state.mouse = pos;
+
+  if (state.mode === 'select') {
+    beginDrag(face, pos);
+    return;
+  }
+
+  if (state.mode === 'addPoint') {
+    addPoint(pos.x, pos.y);
+    render();
+    return;
+  }
+
+  if (state.mode === 'addLine' || state.mode === 'addFace') {
+    const point = getOrCreatePoint(pos);
+    handleBuildPoint(point);
+  }
+});
   }
 
   function drawPoint(g, point) {
