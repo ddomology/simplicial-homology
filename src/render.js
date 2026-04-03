@@ -224,32 +224,6 @@ function drawRotateButton(g, line) {
   g.appendChild(group);
 }
 
-    group.appendChild(
-      createSvg("path", {
-        d: `
-          M ${cx - 5} ${cy + 3}
-          A 7 7 0 1 1 ${cx + 5} ${cy - 3}
-        `,
-        fill: "none",
-        stroke: glue.color,
-        "stroke-width": 2.2,
-        "stroke-linecap": "round",
-        "data-rotate-button": "true",
-      })
-    );
-
-    group.appendChild(
-      createSvg("polygon", {
-        points: `${cx + 4},${cy - 8} ${cx + 10},${cy - 8} ${cx + 7},${cy - 2}`,
-        fill: glue.color,
-        "data-rotate-button": "true",
-      })
-    );
-
-    attachRotateEvents(group, line.id, glue.id);
-    g.appendChild(group);
-  }
-
   function drawPoint(g, point) {
     const face = model.faceRef("point", point.id);
     const s = faceVisualState(face);
