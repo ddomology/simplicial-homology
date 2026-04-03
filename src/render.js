@@ -9,21 +9,20 @@ export function createRenderer({ svg, tooltipEl, state, model, getFaceHandlers }
     return el;
   }
 
-function addText(g, x, y, text, attrs = {}) {
-  const el = createSvg("text", {
-    x,
-    y,
-    "font-size": 14,
-    "font-weight": 700,
-    fill: "#d8e2f5",
-    "text-anchor": "middle",
-    "pointer-events": "none",
-    ...attrs,
-  });
-  el.textContent = text;
-  g.appendChild(el);
-  return el;
-}
+  function addText(g, x, y, text, attrs = {}) {
+    const el = createSvg("text", {
+      x,
+      y,
+      "font-size": 14,
+      "font-weight": 700,
+      fill: "#d8e2f5",
+      "text-anchor": "middle",
+      ...attrs,
+    });
+    el.textContent = text;
+    g.appendChild(el);
+    return el;
+  }
 
   function faceVisualState(face) {
     const hovered = model.faceEquals(state.hoveredFace, face);
@@ -43,6 +42,7 @@ function addText(g, x, y, text, attrs = {}) {
 
   function attachFaceEvents(el, face) {
     const handlers = getFaceHandlers();
+
     el.style.cursor = state.mode === "select" ? "grab" : "pointer";
 
     el.addEventListener("mouseenter", (evt) => {
@@ -57,29 +57,11 @@ function addText(g, x, y, text, attrs = {}) {
       handlers.onFaceHoverEnd?.(face, evt);
     });
 
-	el.addEventListener('pointerdown', evt => {
-	  evt.stopPropagation();
-	  evt.preventDefault();
-
-	  const pos = boardPoint(evt);
-	  state.mouse = pos;
-
-	  if (state.mode === 'select') {
-		beginDrag(face, pos);
-		return;
-	  }
-
-	  if (state.mode === 'addPoint') {
-		addPoint(pos.x, pos.y);
-		render();
-		return;
-	  }
-
-	  if (state.mode === 'addLine' || state.mode === 'addFace') {
-		const point = getOrCreatePoint(pos);
-		handleBuildPoint(point);
-	  }
-	});
+    el.addEventListener("pointerdown", (evt) => {
+      evt.stopPropagation();
+      evt.preventDefault();
+      handlers.onFacePointerDown?.(face, evt);
+    });
   }
 
   function drawPoint(g, point) {
@@ -253,6 +235,7 @@ function addText(g, x, y, text, attrs = {}) {
 
     const cx = (A.x + B.x + C.x) / 3;
     const cy = (A.y + B.y + C.y) / 3;
+
     addText(g, cx, cy + 4, model.faceLabel(faceObj), {
       "font-size": 11,
       fill: "#d8e2f5",
@@ -260,9 +243,7 @@ function addText(g, x, y, text, attrs = {}) {
   }
 
   function renderGrid() {
-	  const grid = createSvg("g", {
-		"pointer-events": "none",
-	  });
+    const grid = createSvg("g");
 
     for (let x = 0; x <= 1200; x += 60) {
       grid.appendChild(
@@ -366,8 +347,8 @@ function addText(g, x, y, text, attrs = {}) {
     svg.appendChild(pointsGroup);
 
     const previewGroup = createSvg("g", {
-	  "pointer-events": "none",
-	});
+      "pointer-events": "none",
+    });
     renderBuildPreview(previewGroup);
     svg.appendChild(previewGroup);
   }
