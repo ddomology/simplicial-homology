@@ -3,7 +3,7 @@ import re
 import xml.etree.ElementTree as ET
 
 ASSETS_DIR = Path(__file__).resolve().parent
-TARGET_FILES = ["undo.svg", "redo.svg"]
+TARGET_FILES = ["undo.svg", "redo.svg", "rotate.svg"]
 
 WHITE = "#ffffff"
 

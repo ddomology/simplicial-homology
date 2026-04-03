@@ -39,6 +39,10 @@ export function createModel(state) {
     return state.points.find((p) => p.id === id) || null;
   }
 
+  function getLineById(id) {
+    return state.lines.find((line) => line.id === id) || null;
+  }
+
   function pointLabel(point) {
     return `P${point.id}`;
   }
@@ -70,9 +74,31 @@ export function createModel(state) {
   }
 
   function getGlueForFace(face) {
-    return state.glues.find(
-      (g) => faceEquals(g.a, face) || faceEquals(g.b, face)
-    ) || null;
+    return (
+      state.glues.find((g) => faceEquals(g.a, face) || faceEquals(g.b, face)) ||
+      null
+    );
+  }
+
+  function getGlueById(id) {
+    return state.glues.find((glue) => glue.id === id) || null;
+  }
+
+  function getLineGlue(lineId) {
+    return (
+      state.glues.find(
+        (glue) =>
+          glue.dim === 1 &&
+          ((glue.a.kind === "line" && glue.a.id === lineId) ||
+            (glue.b.kind === "line" && glue.b.id === lineId))
+      ) || null
+    );
+  }
+
+  function getLineEndpoints(lineId) {
+    const line = getLineById(lineId);
+    if (!line) return null;
+    return [line.a, line.b];
   }
 
   function isCompatible(a, b) {
@@ -107,6 +133,7 @@ export function createModel(state) {
 
   function findLineByEndpoints(aId, bId) {
     const [u, v] = sortedPair(aId, bId);
+
     return (
       state.lines.find((line) => {
         const [x, y] = sortedPair(line.a, line.b);
@@ -133,6 +160,7 @@ export function createModel(state) {
 
   function findFaceByVertices(aId, bId, cId) {
     const target = sortedTriple(aId, bId, cId).join("-");
+
     return (
       state.faces.find(
         (face) =>
@@ -148,6 +176,7 @@ export function createModel(state) {
     const A = getPointById(aId);
     const B = getPointById(bId);
     const C = getPointById(cId);
+
     if (!A || !B || !C) return null;
     if (Math.abs(area2(A, B, C)) < 1e-6) return null;
 
@@ -177,11 +206,160 @@ export function createModel(state) {
       dim: state.selectedFaces[0].dim,
       a: state.selectedFaces[0],
       b: state.selectedFaces[1],
+      reversed: false,
     };
 
     state.glues.push(glue);
     state.selectedFaces = [];
     return glue;
+  }
+
+  function toggleGlueOrientation(glueId) {
+    const glue = getGlueById(glueId);
+    if (!glue || glue.dim !== 1) return null;
+
+    glue.reversed = !glue.reversed;
+    return glue;
+  }
+
+  function buildPointGlueGraph() {
+    const adjacency = new Map();
+    const glueIdsByPoint = new Map();
+
+    function ensurePoint(id) {
+      if (!adjacency.has(id)) adjacency.set(id, new Set());
+      if (!glueIdsByPoint.has(id)) glueIdsByPoint.set(id, new Set());
+    }
+
+    function linkPoints(u, v, glueId) {
+      ensurePoint(u);
+      ensurePoint(v);
+      adjacency.get(u).add(v);
+      adjacency.get(v).add(u);
+      glueIdsByPoint.get(u).add(glueId);
+      glueIdsByPoint.get(v).add(glueId);
+    }
+
+    for (const glue of state.glues) {
+      if (glue.dim === 0) {
+        if (glue.a.kind === "point" && glue.b.kind === "point") {
+          linkPoints(glue.a.id, glue.b.id, glue.id);
+        }
+        continue;
+      }
+
+      if (glue.dim === 1) {
+        const endpointsA = getLineEndpoints(glue.a.id);
+        const endpointsB = getLineEndpoints(glue.b.id);
+        if (!endpointsA || !endpointsB) continue;
+
+        const [a0, a1] = endpointsA;
+        const [b0, b1] = endpointsB;
+
+        if (glue.reversed) {
+          linkPoints(a0, b1, glue.id);
+          linkPoints(a1, b0, glue.id);
+        } else {
+          linkPoints(a0, b0, glue.id);
+          linkPoints(a1, b1, glue.id);
+        }
+      }
+    }
+
+    return { adjacency, glueIdsByPoint };
+  }
+
+  function getPointGlueComponent(pointId) {
+    const { adjacency, glueIdsByPoint } = buildPointGlueGraph();
+
+    if (!adjacency.has(pointId)) {
+      return {
+        pointIds: new Set([pointId]),
+        glueIds: new Set(),
+      };
+    }
+
+    const visited = new Set();
+    const glueIds = new Set();
+    const queue = [pointId];
+    visited.add(pointId);
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+
+      const localGlueIds = glueIdsByPoint.get(current);
+      if (localGlueIds) {
+        for (const glueId of localGlueIds) {
+          glueIds.add(glueId);
+        }
+      }
+
+      const neighbors = adjacency.get(current);
+      if (!neighbors) continue;
+
+      for (const next of neighbors) {
+        if (visited.has(next)) continue;
+        visited.add(next);
+        queue.push(next);
+      }
+    }
+
+    return {
+      pointIds: visited,
+      glueIds,
+    };
+  }
+
+  function getPointGlueColor(pointId) {
+    const component = getPointGlueComponent(pointId);
+    if (component.glueIds.size === 0) return null;
+
+    let bestGlue = null;
+    for (const glueId of component.glueIds) {
+      const glue = getGlueById(glueId);
+      if (!glue) continue;
+      if (!bestGlue || glue.id < bestGlue.id) {
+        bestGlue = glue;
+      }
+    }
+
+    return bestGlue ? bestGlue.color : null;
+  }
+
+  function getLineArrowDirection(lineId) {
+    const glue = getLineGlue(lineId);
+    const line = getLineById(lineId);
+
+    if (!glue || !line) return null;
+
+    if (glue.a.kind === "line" && glue.a.id === lineId) {
+      return {
+        fromPointId: line.a,
+        toPointId: line.b,
+        reversed: false,
+        glueId: glue.id,
+      };
+    }
+
+    if (glue.b.kind === "line" && glue.b.id === lineId) {
+      if (glue.reversed) {
+        return {
+          fromPointId: line.b,
+          toPointId: line.a,
+          reversed: true,
+          glueId: glue.id,
+        };
+      }
+
+      return {
+        fromPointId: line.a,
+        toPointId: line.b,
+        reversed: false,
+        glueId: glue.id,
+      };
+    }
+
+    return null;
   }
 
   function getDragPointIds(face) {
@@ -198,56 +376,55 @@ export function createModel(state) {
     return area ? [area.a, area.b, area.c] : [];
   }
 
-	function resetState(clearHistory = true) {
-	  state.points = [];
-	  state.lines = [];
-	  state.faces = [];
-	  state.hoveredFace = null;
-	  state.selectedFaces = [];
-	  state.glues = [];
-	  state.nextPointId = 1;
-	  state.nextLineId = 1;
-	  state.nextFaceId = 1;
-	  state.nextGlueId = 1;
-	  state.buildVertices = [];
-	  state.mouse = { x: 0, y: 0 };
-	  state.drag = {
-		active: false,
-		moved: false,
-		face: null,
-		startMouse: null,
-		pointStarts: [],
-		beforeSnapshot: null,
-	  };
+  function resetState(clearHistory = true) {
+    state.points = [];
+    state.lines = [];
+    state.faces = [];
+    state.hoveredFace = null;
+    state.selectedFaces = [];
+    state.glues = [];
+    state.nextPointId = 1;
+    state.nextLineId = 1;
+    state.nextFaceId = 1;
+    state.nextGlueId = 1;
+    state.buildVertices = [];
+    state.mouse = { x: 0, y: 0 };
+    state.drag = {
+      active: false,
+      moved: false,
+      face: null,
+      startMouse: null,
+      pointStarts: [],
+      beforeSnapshot: null,
+    };
 
-	  if (clearHistory) {
-		state.history.undoStack = [];
-		state.history.redoStack = [];
-	  }
-	}
+    if (clearHistory) {
+      state.history.undoStack = [];
+      state.history.redoStack = [];
+    }
+  }
 
   return {
     state,
-
     distance,
     area2,
     sortedPair,
     sortedTriple,
     nearestPoint,
-
     getPointById,
+    getLineById,
+    getGlueById,
+    getLineGlue,
+    getLineEndpoints,
     pointLabel,
     lineLabel,
     faceLabel,
-
     faceRef,
     faceEquals,
     faceName,
-
     getGlueForFace,
     isCompatible,
     canApplyGlue,
-
     addPoint,
     getOrCreatePoint,
     findLineByEndpoints,
@@ -255,7 +432,11 @@ export function createModel(state) {
     findFaceByVertices,
     addFace,
     applyGlue,
-
+    toggleGlueOrientation,
+    buildPointGlueGraph,
+    getPointGlueComponent,
+    getPointGlueColor,
+    getLineArrowDirection,
     getDragPointIds,
     resetState,
   };
