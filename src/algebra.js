@@ -1,29 +1,33 @@
 const PANEL_IDS = {
   0: {
-    ker: "ker-0",
-    im: "im-1",
-    iso: "iso-0",
-    basis: "basis-0",
+    kerBasis: "h0-ker-basis",
+    kerGroup: "h0-ker-group",
+    imBasis: "h0-im-basis",
+    imGroup: "h0-im-group",
+    homology: "h0-group",
   },
   1: {
-    ker: "ker-1",
-    im: "im-2",
-    iso: "iso-1",
-    basis: "basis-1",
+    kerBasis: "h1-ker-basis",
+    kerGroup: "h1-ker-group",
+    imBasis: "h1-im-basis",
+    imGroup: "h1-im-group",
+    homology: "h1-group",
   },
   2: {
-    ker: "ker-2",
-    im: "im-3",
-    iso: "iso-2",
-    basis: "basis-2",
+    kerBasis: "h2-ker-basis",
+    kerGroup: "h2-ker-group",
+    imBasis: "h2-im-basis",
+    imGroup: "h2-im-group",
+    homology: "h2-group",
   },
 };
 
 const DEFAULT_TEXT = {
-  ker: "표시 예정",
-  im: "표시 예정",
-  iso: "표시 예정",
-  basis: "표시 예정",
+  kerBasis: "표시 예정",
+  kerGroup: "표시 예정",
+  imBasis: "표시 예정",
+  imGroup: "표시 예정",
+  homology: "표시 예정",
 };
 
 function getEl(id) {
@@ -43,10 +47,11 @@ function setRow(group, key, value) {
 }
 
 function setGroup(group, values = {}) {
-  setRow(group, "ker", values.ker ?? DEFAULT_TEXT.ker);
-  setRow(group, "im", values.im ?? DEFAULT_TEXT.im);
-  setRow(group, "iso", values.iso ?? DEFAULT_TEXT.iso);
-  setRow(group, "basis", values.basis ?? DEFAULT_TEXT.basis);
+  setRow(group, "kerBasis", values.kerBasis ?? DEFAULT_TEXT.kerBasis);
+  setRow(group, "kerGroup", values.kerGroup ?? DEFAULT_TEXT.kerGroup);
+  setRow(group, "imBasis", values.imBasis ?? DEFAULT_TEXT.imBasis);
+  setRow(group, "imGroup", values.imGroup ?? DEFAULT_TEXT.imGroup);
+  setRow(group, "homology", values.homology ?? DEFAULT_TEXT.homology);
 }
 
 export function resetAlgebraPanel() {
@@ -62,9 +67,7 @@ export function setAlgebraPanel(values = {}) {
 }
 
 /*
-  지금은 계산 전 단계라서, state를 받아서
-  대충 chain group 크기 정도만 보여주는 placeholder 업데이트를 한다.
-  나중에 여기 안에 boundary matrix / ker / im / quotient 계산을 붙이면 됨.
+  아직 계산은 안 붙이고, 새 UI 구조에 맞는 placeholder만 채운다.
 */
 export function updateAlgebraFromState(state) {
   const c0 = state?.points?.length ?? 0;
@@ -72,24 +75,27 @@ export function updateAlgebraFromState(state) {
   const c2 = state?.faces?.length ?? 0;
 
   setGroup(0, {
-    ker: `ker ∂_0: 계산 전`,
-    im: `im ∂_1: 계산 전`,
-    iso: `H_0 ≅ 계산 전`,
-    basis: `C_0 basis 후보: ${c0}개 vertex`,
+    kerBasis: `계산 전 (C_0 후보 ${c0}개)`,
+    kerGroup: "계산 전",
+    imBasis: "계산 전",
+    imGroup: "계산 전",
+    homology: "계산 전",
   });
 
   setGroup(1, {
-    ker: `ker ∂_1: 계산 전`,
-    im: `im ∂_2: 계산 전`,
-    iso: `H_1 ≅ 계산 전`,
-    basis: `C_1 basis 후보: ${c1}개 edge`,
+    kerBasis: `계산 전 (C_1 후보 ${c1}개)`,
+    kerGroup: "계산 전",
+    imBasis: "계산 전",
+    imGroup: "계산 전",
+    homology: "계산 전",
   });
 
   setGroup(2, {
-    ker: `ker ∂_2: 계산 전`,
-    im: `im ∂_3: 0`,
-    iso: `H_2 ≅ 계산 전`,
-    basis: `C_2 basis 후보: ${c2}개 face`,
+    kerBasis: `계산 전 (C_2 후보 ${c2}개)`,
+    kerGroup: "계산 전",
+    imBasis: "0",
+    imGroup: "0",
+    homology: "계산 전",
   });
 }
 
