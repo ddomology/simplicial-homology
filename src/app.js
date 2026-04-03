@@ -155,10 +155,49 @@ function bindToolbarEvents() {
 function initialize() {
   initializeAlgebraPanel(state);
   bindToolbarEvents();
+  bindKeyboardShortcuts();
   interaction.bindGlobalEvents();
   interaction.runSelfTests();
   interaction.seedDemo();
   renderAll();
+}
+
+function bindKeyboardShortcuts() {
+  window.addEventListener("keydown", (evt) => {
+    const target = evt.target;
+    const isTypingTarget =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable;
+
+    if (isTypingTarget) return;
+
+    const mod = evt.ctrlKey || evt.metaKey;
+    if (!mod) return;
+
+    const key = evt.key.toLowerCase();
+
+    // Undo: Ctrl/Cmd + Z
+    if (key === "z" && !evt.shiftKey) {
+      evt.preventDefault();
+      interaction.undoHistory();
+      return;
+    }
+
+    // Redo: Ctrl/Cmd + Shift + Z
+    if (key === "z" && evt.shiftKey) {
+      evt.preventDefault();
+      interaction.redoHistory();
+      return;
+    }
+
+    // Redo: Ctrl/Cmd + Y
+    if (key === "y") {
+      evt.preventDefault();
+      interaction.redoHistory();
+    }
+  });
 }
 
 initialize();
