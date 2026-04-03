@@ -57,7 +57,7 @@ function addText(g, x, y, text, attrs = {}) {
       handlers.onFaceHoverEnd?.(face, evt);
     });
 
-	el.addEventListener('mousedown', evt => {
+	el.addEventListener('pointerdown', evt => {
 	  evt.stopPropagation();
 	  evt.preventDefault();
 
