@@ -23,12 +23,14 @@ const PANEL_IDS = {
 };
 
 const DEFAULT_TEXT = {
-  kerBasis: "표시 예정",
-  kerGroup: "표시 예정",
-  imBasis: "표시 예정",
-  imGroup: "표시 예정",
-  homology: "표시 예정",
+  kerBasis: "계산 전",
+  kerGroup: "계산 전",
+  imBasis: "계산 전",
+  imGroup: "계산 전",
+  homology: "계산 전",
 };
+
+let lastPanelSignature = "";
 
 function getEl(id) {
   return document.getElementById(id);
@@ -54,52 +56,102 @@ function setGroup(group, values = {}) {
   setRow(group, "homology", values.homology ?? DEFAULT_TEXT.homology);
 }
 
-export function resetAlgebraPanel() {
-  setGroup(0);
-  setGroup(1);
-  setGroup(2);
+function collectMathElements() {
+  return Object.values(PANEL_IDS)
+    .flatMap((group) => Object.values(group))
+    .map((id) => getEl(id))
+    .filter(Boolean);
 }
 
-export function setAlgebraPanel(values = {}) {
+async function typesetAlgebraPanel() {
+  if (!window.MathJax?.typesetPromise) return;
+  try {
+    await window.MathJax.typesetPromise(collectMathElements());
+  } catch (err) {
+    console.error("MathJax typeset failed:", err);
+  }
+}
+
+function normalizeValues(values = {}) {
+  return {
+    0: {
+      kerBasis: values[0]?.kerBasis ?? DEFAULT_TEXT.kerBasis,
+      kerGroup: values[0]?.kerGroup ?? DEFAULT_TEXT.kerGroup,
+      imBasis: values[0]?.imBasis ?? DEFAULT_TEXT.imBasis,
+      imGroup: values[0]?.imGroup ?? DEFAULT_TEXT.imGroup,
+      homology: values[0]?.homology ?? DEFAULT_TEXT.homology,
+    },
+    1: {
+      kerBasis: values[1]?.kerBasis ?? DEFAULT_TEXT.kerBasis,
+      kerGroup: values[1]?.kerGroup ?? DEFAULT_TEXT.kerGroup,
+      imBasis: values[1]?.imBasis ?? DEFAULT_TEXT.imBasis,
+      imGroup: values[1]?.imGroup ?? DEFAULT_TEXT.imGroup,
+      homology: values[1]?.homology ?? DEFAULT_TEXT.homology,
+    },
+    2: {
+      kerBasis: values[2]?.kerBasis ?? DEFAULT_TEXT.kerBasis,
+      kerGroup: values[2]?.kerGroup ?? DEFAULT_TEXT.kerGroup,
+      imBasis: values[2]?.imBasis ?? DEFAULT_TEXT.imBasis,
+      imGroup: values[2]?.imGroup ?? DEFAULT_TEXT.imGroup,
+      homology: values[2]?.homology ?? DEFAULT_TEXT.homology,
+    },
+  };
+}
+
+export function resetAlgebraPanel() {
+  const values = normalizeValues();
   setGroup(0, values[0]);
   setGroup(1, values[1]);
   setGroup(2, values[2]);
+  lastPanelSignature = JSON.stringify(values);
+  typesetAlgebraPanel();
 }
 
-/*
-  아직 계산은 안 붙이고, 새 UI 구조에 맞는 placeholder만 채운다.
-*/
+export function setAlgebraPanel(values = {}) {
+  const normalized = normalizeValues(values);
+  const signature = JSON.stringify(normalized);
+
+  if (signature === lastPanelSignature) return;
+
+  setGroup(0, normalized[0]);
+  setGroup(1, normalized[1]);
+  setGroup(2, normalized[2]);
+
+  lastPanelSignature = signature;
+  typesetAlgebraPanel();
+}
+
 export function updateAlgebraFromState(state) {
   const c0 = state?.points?.length ?? 0;
   const c1 = state?.lines?.length ?? 0;
   const c2 = state?.faces?.length ?? 0;
 
-  setGroup(0, {
-    kerBasis: `계산 전 (C_0 후보 ${c0}개)`,
-    kerGroup: "계산 전",
-    imBasis: "계산 전",
-    imGroup: "계산 전",
-    homology: "계산 전",
-  });
-
-  setGroup(1, {
-    kerBasis: `계산 전 (C_1 후보 ${c1}개)`,
-    kerGroup: "계산 전",
-    imBasis: "계산 전",
-    imGroup: "계산 전",
-    homology: "계산 전",
-  });
-
-  setGroup(2, {
-    kerBasis: `계산 전 (C_2 후보 ${c2}개)`,
-    kerGroup: "계산 전",
-    imBasis: "0",
-    imGroup: "0",
-    homology: "계산 전",
+  setAlgebraPanel({
+    0: {
+      kerBasis: `\\(C_0\\) 후보 ${c0}개`,
+      kerGroup: "계산 전",
+      imBasis: "계산 전",
+      imGroup: "계산 전",
+      homology: "계산 전",
+    },
+    1: {
+      kerBasis: `\\(C_1\\) 후보 ${c1}개`,
+      kerGroup: "계산 전",
+      imBasis: "계산 전",
+      imGroup: "계산 전",
+      homology: "계산 전",
+    },
+    2: {
+      kerBasis: `\\(C_2\\) 후보 ${c2}개`,
+      kerGroup: "계산 전",
+      imBasis: "\\(0\\)",
+      imGroup: "\\(0\\)",
+      homology: "계산 전",
+    },
   });
 }
 
 export function initializeAlgebraPanel(state) {
-  resetAlgebraPanel();
+  lastPanelSignature = "";
   updateAlgebraFromState(state);
 }
